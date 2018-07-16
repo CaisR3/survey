@@ -1,10 +1,10 @@
 package com.template
 
-import net.corda.core.contracts.CommandData
-import net.corda.core.contracts.Contract
-import net.corda.core.contracts.ContractState
+import net.corda.core.contracts.*
 import net.corda.core.identity.AbstractParty
+import net.corda.core.identity.Party
 import net.corda.core.transactions.LedgerTransaction
+import java.util.*
 
 // *****************
 // * Contract Code *
@@ -28,6 +28,13 @@ class TemplateContract : Contract {
 // *********
 // * State *
 // *********
-data class TemplateState(val data: String) : ContractState {
+data class TemplateState(val issuer: Party,
+                         val buyer: Party,
+                         val propertyAddress: String,
+                         val surveyDate: Date,
+                         val expiryDate: Date,
+                         val initialPrice: Int,
+                         val resalePrice: Int,
+                         override val linearId: UniqueIdentifier) : LinearState {
     override val participants: List<AbstractParty> get() = listOf()
 }
