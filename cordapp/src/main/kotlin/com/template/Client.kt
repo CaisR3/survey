@@ -15,7 +15,7 @@ fun main(args: Array<String>) = TemplateClient().main(args)
 private class TemplateClient {
     companion object {
         val logger: Logger = loggerFor<TemplateClient>()
-        private fun logState(state: StateAndRef<TemplateState>) = logger.info("{}", state.state.data)
+        private fun logState(state: StateAndRef<SurveyState>) = logger.info("{}", state.state.data)
     }
 
     fun main(args: Array<String>) {
@@ -27,7 +27,7 @@ private class TemplateClient {
         val proxy = client.start("user1", "test").proxy
 
         // Grab all existing TemplateStates and all future TemplateStates.
-        val (snapshot, updates) = proxy.vaultTrack(TemplateState::class.java)
+        val (snapshot, updates) = proxy.vaultTrack(SurveyState::class.java)
 
         // Log the existing TemplateStates and listen for new ones.
         snapshot.states.forEach { logState(it) }
