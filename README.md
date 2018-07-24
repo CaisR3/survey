@@ -1,2 +1,2 @@
 # survey
-Secondary market for surveys
+Secondary market for housing surveys built on the Corda platform
