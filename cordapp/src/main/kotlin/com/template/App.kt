@@ -34,7 +34,7 @@ class TemplateApi(val rpcOps: CordaRPCOps) {
 class Initiator : FlowLogic<Unit>() {
     @Suspendable
     override fun call() {
-        // Flow implementation goes here
+        // Flow impl
     }
 }
 
