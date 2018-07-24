@@ -1,5 +1,6 @@
 package com.template
 
+import com.survey.Responder
 import net.corda.testing.node.MockNetwork
 import org.junit.After
 import org.junit.Before
@@ -7,7 +8,7 @@ import org.junit.Test
 
 class FlowTests {
 
-    private val network = MockNetwork(listOf("com.template"))
+    private val network = MockNetwork(listOf("com.survey"))
     private val a = network.createNode()
     private val b = network.createNode()
 
