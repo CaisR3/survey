@@ -1,6 +1,6 @@
 package com.template
 
-import com.survey.Responder
+
 import net.corda.testing.node.MockNetwork
 import org.junit.After
 import org.junit.Before
@@ -14,7 +14,7 @@ class FlowTests {
 
     init {
         listOf(a, b).forEach {
-            it.registerInitiatedFlow(Responder::class.java)
+
         }
     }
 
