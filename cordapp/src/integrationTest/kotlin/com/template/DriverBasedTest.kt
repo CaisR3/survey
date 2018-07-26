@@ -1,4 +1,4 @@
-package com.template
+package com.survey
 
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.utilities.getOrThrow
@@ -37,11 +37,11 @@ class DriverBasedTest {
         // the node's webserver, to verify that the nodes' webservers have started and have loaded the API.
         startWebServers(bankA, bankB).forEach {
             val request = Request.Builder()
-                .url("http://${it.listenAddress}/api/template/templateGetEndpoint")
+                .url("http://${it.listenAddress}/api/survey/test")
                 .build()
             val response = OkHttpClient().newCall(request).execute()
 
-            assertEquals("Template GET endpoint.", response.body().string())
+            assertEquals("Survey GET endpoint.", response.body().string())
         }
     }
 
