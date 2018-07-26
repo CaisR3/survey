@@ -1,4 +1,4 @@
-package com.template
+package com.survey
 
 
 import net.corda.testing.node.MockNetwork

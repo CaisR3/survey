@@ -1,6 +1,6 @@
 package com.survey.client
 
-import com.template.SurveyState
+import com.survey.SurveyState
 import net.corda.client.rpc.CordaRPCClient
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.utilities.NetworkHostAndPort.Companion.parse

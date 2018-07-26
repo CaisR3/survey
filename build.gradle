@@ -143,6 +143,6 @@ task deployNodes(type: net.corda.plugins.Cordform, dependsOn: ['jar']) {
 
 task runTemplateClient(type: JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
-    main = 'com.template.ClientKt'
+    main = 'com.survey.ClientKt'
     args 'localhost:10006'
 }

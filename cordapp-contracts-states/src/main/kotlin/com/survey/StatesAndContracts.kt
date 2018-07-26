@@ -1,19 +1,24 @@
-package com.template
+package com.survey
 
 import net.corda.core.contracts.*
 import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.Party
 import net.corda.core.transactions.LedgerTransaction
 import net.corda.finance.contracts.asset.Cash
-import java.util.*
+
+
 
 // *****************
 // * Contract Code *
 // *****************
 // This is used to identify our contract when building a transaction
-val TEMPLATE_CONTRACT_ID = "com.template.TemplateContract"
 
-class TemplateContract : Contract {
+class SurveyContract : Contract {
+
+    companion object {
+        @JvmStatic
+        val SURVEY_CONTRACT_ID = "com.survey.SurveyContract"
+    }
     // A transaction is considered valid if the verify() function of the contract of each of the transaction's input
     // and output states does not throw an exception.
     override fun verify(tx: LedgerTransaction) {
@@ -28,7 +33,7 @@ class TemplateContract : Contract {
                     "Issuer must be the signer." using (command.signers.contains(out.issuer.owningKey))
                     // Survey-specific constraints.
                     "The survey's value must be non-negative." using (out.initialPrice > 0)
-                    "The initial price is equal to the resale price" using (out.initialPrice == out.resalePrice)
+                    "The initial price is equal to the resale price" using (out.initialPrice != out.resalePrice)
                 }
             }
             is Commands.Trade -> {
@@ -71,9 +76,9 @@ data class SurveyState(val issuer: Party,
                          val owner: Party,
                          val propertyAddress: String,
                          val landTitleId: String,
-                         val surveyDate: Date,
-                         val issuanceDate: Date,
-                         val expiryDate: Date,
+                         val surveyDate: String,
+                         val issuanceDate: String,
+                         val expiryDate: String,
                          val initialPrice: Int,
                          val resalePrice: Int,
                          override val linearId: UniqueIdentifier) : LinearState {
