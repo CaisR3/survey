@@ -1,6 +1,8 @@
 package com.survey
 
+import com.sun.crypto.provider.AESKeyGenerator
 import net.corda.core.contracts.*
+import net.corda.core.crypto.SecureHash
 import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.Party
 import net.corda.core.transactions.LedgerTransaction
@@ -24,6 +26,9 @@ class SurveyContract : Contract {
     override fun verify(tx: LedgerTransaction) {
         val command = tx.commands.requireSingleCommand<Commands>()
         when(command.value){
+            is Commands.IssueRequest -> {
+
+            }
             is Commands.Issue -> {
                 requireThat {
                     "Only one output state should be created." using (tx.outputs.size == 1)
@@ -66,21 +71,48 @@ class SurveyContract : Contract {
     interface Commands : CommandData {
         class Issue : Commands
         class Trade : Commands
+        class IssueRequest : Commands
     }
 }
 
 // *********
 // * State *
 // *********
-data class SurveyState(val issuer: Party,
+data class SurveyState(  val issuer: Party,
                          val owner: Party,
                          val propertyAddress: String,
                          val landTitleId: String,
                          val surveyDate: String,
-                         val issuanceDate: String,
-                         val expiryDate: String,
                          val initialPrice: Int,
-                         val resalePrice: Int,
+                         val resalePrice : Int,
                          override val linearId: UniqueIdentifier) : LinearState {
     override val participants: List<AbstractParty> get() = listOf(issuer, owner)
+}
+
+// *********
+// * SurveyIssuanceState
+// * The facts shared by the surveyor to
+// * the buyer once the survey is complete
+// *********
+data class SurveyKeyState(     val surveyor : Party,
+                               val purchaser : Party,
+                               val encodedSurveyHash: String,
+                               val encodedSurveyKey : String,
+                               override val linearId: UniqueIdentifier) : LinearState {
+    override val participants: List<AbstractParty> get() = listOf(surveyor, purchaser)
+}
+
+// *********
+// * SurveyRequestState
+// * For potential to make a request for a survey
+// * at a particular address for price.
+// *********
+data class SurveyRequestState(val requester :Party,
+                              val surveyor : Party,
+                              val propertyAddress: String,
+                              val landTitleId: String,
+                              val surveyPrice : Int,
+                              override val linearId : UniqueIdentifier) : LinearState {
+    override val participants: List<AbstractParty>
+        get() = listOf(requester)
 }
