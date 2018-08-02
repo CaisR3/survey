@@ -38,6 +38,7 @@ object IssueFlow{
             val issuer = serviceHub.myInfo.legalIdentities.first()
             val owner = serviceHub.myInfo.legalIdentities.first()
 
+
             //Step 1 :  generate unsigned transaction
             progressTracker.currentStep = GENERATING_TRANSACTION
             val surveyState = SurveyState(issuer, owner, propertyAddress, landTitleId, surveyDate, issuanceDate, expiryDate, initialPrice, resalePrice, UniqueIdentifier())
