@@ -1,6 +1,7 @@
 package com.survey
 
 import net.corda.core.contracts.*
+import net.corda.core.crypto.SecureHash
 import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.Party
 import net.corda.core.transactions.LedgerTransaction
@@ -46,39 +47,66 @@ class SurveyContract : Contract {
                 }
             }
             is Commands.Issue -> {
+                val outputSurvey = tx.outputsOfType<SurveyState>().single()
                 requireThat {
                     // Input and output states.
                     "One input state should be consumed, the survey request." using (tx.inputStates.size == 1)
                     "Three output states should be created, the survey, the survey key, and the survey request." using (tx.outputs.size == 3)
 
                     val inputSurveyRequest = tx.inputsOfType<SurveyRequestState>().single()
-                    val outputSurvey = tx.outputsOfType<SurveyState>().single()
-                    val outputSurveyKey = tx.outputsOfType<SurveyKeyState>().single()
+                    val outputSurveyKey = tx.outputsOfType<SurveyKeyState>().singleOrNull()
                     val outputSurveyRequest = tx.outputsOfType<SurveyRequestState>().single()
                     // Sample constraints.
                     "The survey's initial price must be positive." using (outputSurvey.initialPrice > 0)
                     "The initial price must be equal to the resale price." using (outputSurvey.initialPrice == outputSurvey.resalePrice)
                     "The output survey request status is complete." using (outputSurveyRequest.status == "Complete")
+                    "The key is included." using (outputSurveyKey != null)
 
                     // Owners and signers.
                     "The purchase requester is the final survey owner." using (inputSurveyRequest.requester == outputSurvey.owner)
-                    "The purchase requester is the final survey key owner." using (inputSurveyRequest.requester == outputSurveyKey.owner)
                     "Issuer must be the signer." using (command.signers.contains(outputSurvey.issuer.owningKey))
                     "Purchaser must be the signer." using (command.signers.contains(outputSurvey.owner.owningKey))
+                }
+                try {
+                    tx.getAttachment(outputSurvey.surveyHash)
+                } catch(e: Exception) {
+                    throw kotlin.IllegalArgumentException("Attachment missing or does not match hash.")
+                }
+
+            }
+            is Commands.SendKey -> {
+                requireThat {
+                    // Input and output states.
+                    "There should be one input state, the key." using (tx.inputStates.size == 1)
+                    "There should be one output state, the key." using (tx.outputStates.size == 1)
+                    val inputSurveyKey = tx.inputsOfType<SurveyKeyState>().single()
+                    val outputSurveyKey = tx.outputsOfType<SurveyKeyState>().single()
+                    "The key should be the same before and after." using (inputSurveyKey.encodedSurveyKey == outputSurveyKey.encodedSurveyKey)
                 }
             }
             is Commands.Trade -> {
                 requireThat {
                     // Input and output states.
-                    "There should be three input states." using (tx.inputStates.size == 3)
-                    "There should be three output states." using (tx.outputStates.size == 3)
                     val inputCash = tx.inputsOfType<Cash.State>().single()
                     val inputSurvey = tx.inputsOfType<SurveyState>().single()
                     val inputSurveyKey = tx.inputsOfType<SurveyKeyState>().single()
                     val outputSurvey = tx.outputsOfType<SurveyState>().single()
                     val outputSurveyKey = tx.outputsOfType<SurveyKeyState>().single()
                     val outputCash = tx.outputsOfType<Cash.State>().single()
-                    "The initial and final hashes must be the same." using (inputSurveyKey.encodedSurveyHash == outputSurveyKey.encodedSurveyHash)
+                    "There should be one input survey state" using (tx.inputsOfType<SurveyState>().size == 1)
+                    "There should be one output survey state" using (tx.outputsOfType<SurveyState>().size == 1)
+
+                    "There should be at least input cast state" using (tx.inputsOfType<Cash>().size == 1)
+                    "There should be one output cast state" using (tx.outputsOfType<Cash>().size == 1)                            "" +
+
+
+
+                    **************************
+
+
+
+
+                    "The initial and final hashes must be the same." using (inputSurveyKey.encodedSur veyHash == outputSurveyKey.encodedSurveyHash)
                     "The initial and final keys must the same." using (inputSurveyKey.encodedSurveyKey == outputSurveyKey.encodedSurveyKey)
                     "Input cash should be equal to the resale price" using (inputCash.amount.quantity.toInt() == outputSurvey.resalePrice)
                     "Output cash should be equal to resale price" using (outputCash.amount.quantity.toInt() == inputSurvey.resalePrice)
@@ -102,6 +130,7 @@ class SurveyContract : Contract {
         class Issue : Commands
         class Trade : Commands
         class IssueRequest : Commands
+        class SendKey: Commands
     }
 }
 
@@ -115,6 +144,7 @@ data class SurveyState(val issuer: Party,
                        val surveyDate: String,
                        val initialPrice: Int,
                        val resalePrice: Int,
+                       val surveyHash: SecureHash,
                        override val linearId: UniqueIdentifier) : LinearState {
     override val participants: List<AbstractParty> get() = listOf(issuer, owner)
 }
@@ -124,12 +154,9 @@ data class SurveyState(val issuer: Party,
 // * The facts shared by the surveyor to
 // * the buyer once the survey is complete
 // *********
-data class SurveyKeyState(val surveyor: Party,
-                          val owner: Party,
-                          val encodedSurveyHash: String,
-                          val encodedSurveyKey: String,
+data class SurveyKeyState(val encodedSurveyKey: String,
                           override val linearId: UniqueIdentifier) : LinearState {
-    override val participants: List<AbstractParty> get() = listOf(surveyor, owner)
+    override val participants: List<AbstractParty> get() = listOf()
 }
 
 // *********
@@ -139,7 +166,6 @@ data class SurveyKeyState(val surveyor: Party,
 // *********
 data class SurveyRequestState(val requester: Party,
                               val surveyor: Party,
-                              val propertyAddress: String,
                               val landTitleId: String,
                               val surveyPrice: Int,
                               val status: String,
