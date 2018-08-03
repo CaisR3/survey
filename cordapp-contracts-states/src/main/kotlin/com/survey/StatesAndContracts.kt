@@ -72,20 +72,21 @@ class SurveyContract : Contract {
         class Issue : Commands
         class Trade : Commands
         class IssueRequest : Commands
+        class OracleCommand(val linearId: UniqueIdentifier) : Commands
     }
 }
 
 // *********
 // * State *
 // *********
-data class SurveyState(  val issuer: Party,
-                         val owner: Party,
-                         val propertyAddress: String,
-                         val landTitleId: String,
-                         val surveyDate: String,
-                         val initialPrice: Int,
-                         val resalePrice : Int,
-                         override val linearId: UniqueIdentifier) : LinearState {
+data class SurveyState(val issuer: Party,
+                       val owner: Party,
+                       val propertyAddress: String,
+                       val landTitleId: String,
+                       val surveyDate: String,
+                       val initialPrice: Int,
+                       val resalePrice : Int,
+                       override val linearId: UniqueIdentifier) : LinearState {
     override val participants: List<AbstractParty> get() = listOf(issuer, owner)
 }
 
@@ -94,12 +95,10 @@ data class SurveyState(  val issuer: Party,
 // * The facts shared by the surveyor to
 // * the buyer once the survey is complete
 // *********
-data class SurveyKeyState(     val surveyor : Party,
-                               val purchaser : Party,
-                               val encodedSurveyHash: String,
-                               val encodedSurveyKey : String,
-                               override val linearId: UniqueIdentifier) : LinearState {
-    override val participants: List<AbstractParty> get() = listOf(surveyor, purchaser)
+data class SurveyKeyState(val encodedSurveyHash: String,
+                          val encodedSurveyKey : String,
+                          override val linearId: UniqueIdentifier) : LinearState {
+    override val participants: List<AbstractParty> get() = listOf()
 }
 
 // *********
