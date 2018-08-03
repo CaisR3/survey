@@ -34,42 +34,6 @@ object TradeFlow{
         @Suspendable
         override fun call() {
 
-            // Obtain a reference to the notary we want to use
-            val notary = serviceHub.networkMapCache.notaryIdentities[0]
-
-            // Identity of issuer of Survey == identity of survey owner
-            val issuer = serviceHub.myInfo.legalIdentities.first()
-            val owner = serviceHub.myInfo.legalIdentities.first()
-
-            // Step 1 :  generate unsigned transaction
-            progressTracker.currentStep = GENERATING_TRANSACTION
-            val surveyState = SurveyState(issuer, owner, propertyAddress, landTitleId, surveyDate, issuanceDate, expiryDate, initialPrice, resalePrice, UniqueIdentifier())
-            val txCommand = Command(SurveyContract.Commands.Issue(), surveyState.participants.map { it.owningKey })
-            val txBuilder = TransactionBuilder(notary)
-                    .addOutputState(surveyState, SURVEY_CONTRACT_ID)
-                    .addCommand(txCommand)
-
-            // Stage 2.
-            progressTracker.currentStep = VERIFYING_TRANSACTION
-            // Verify that the transaction is valid.
-            txBuilder.verify(serviceHub)
-
-            // Stage 3.
-            progressTracker.currentStep = SIGNING_TRANSACTION
-            // Issuer signs the transaction.
-            val selfSignedTx = serviceHub.signInitialTransaction(txBuilder)
-
-            // Stage 4.
-            progressTracker.currentStep = GATHERING_SIGS
-            // Send the state to the counterparty which in this case is the issuer himself, and receive it back with their signature.
-            val otherPartyFlow = initiateFlow(owner)
-            val fullySignedTx = subFlow(CollectSignaturesFlow(selfSignedTx, setOf(otherPartyFlow), GATHERING_SIGS.childProgressTracker()))
-
-            // Stage 5.
-            progressTracker.currentStep = FINALISING_TRANSACTION
-            // Notarise and record the transaction in both parties' vaults.
-            subFlow(FinalityFlow(fullySignedTx))
-
         }
 
         /**
