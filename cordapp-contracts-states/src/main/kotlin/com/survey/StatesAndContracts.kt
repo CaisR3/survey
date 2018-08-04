@@ -6,7 +6,7 @@ import net.corda.core.identity.AbstractParty
 import net.corda.core.identity.Party
 import net.corda.core.transactions.LedgerTransaction
 import net.corda.finance.contracts.asset.Cash
-
+import net.corda.finance.utils.sumCash
 
 
 // *****************
@@ -87,39 +87,24 @@ class SurveyContract : Contract {
             is Commands.Trade -> {
                 requireThat {
                     // Input and output states.
-                    val inputCash = tx.inputsOfType<Cash.State>().single()
+                    val inputCash = tx.inputsOfType<Cash.State>().toList()
                     val inputSurvey = tx.inputsOfType<SurveyState>().single()
-                    val inputSurveyKey = tx.inputsOfType<SurveyKeyState>().single()
                     val outputSurvey = tx.outputsOfType<SurveyState>().single()
-                    val outputSurveyKey = tx.outputsOfType<SurveyKeyState>().single()
                     val outputCash = tx.outputsOfType<Cash.State>().single()
                     "There should be one input survey state" using (tx.inputsOfType<SurveyState>().size == 1)
                     "There should be one output survey state" using (tx.outputsOfType<SurveyState>().size == 1)
-
-                    "There should be at least input cast state" using (tx.inputsOfType<Cash>().size == 1)
-                    "There should be one output cast state" using (tx.outputsOfType<Cash>().size == 1)                            "" +
-
-
-
-                    **************************
-
-
-
-
-                    "The initial and final hashes must be the same." using (inputSurveyKey.encodedSur veyHash == outputSurveyKey.encodedSurveyHash)
-                    "The initial and final keys must the same." using (inputSurveyKey.encodedSurveyKey == outputSurveyKey.encodedSurveyKey)
-                    "Input cash should be equal to the resale price" using (inputCash.amount.quantity.toInt() == outputSurvey.resalePrice)
+                    "There should be at least input cast state" using (tx.inputsOfType<Cash.State>().size > 1)
+                    "There should be one output cast state" using (tx.outputsOfType<Cash.State>().size == 1)
+                    "The initial and final hashes must be the same." using (inputSurvey.surveyHash == outputSurvey.surveyHash)
+                    "Input cash should be equal to the resale price" using (inputCash.sumCash().quantity.toInt() == outputSurvey.resalePrice)
                     "Output cash should be equal to resale price" using (outputCash.amount.quantity.toInt() == inputSurvey.resalePrice)
 
                     // Owners and signers.
-                    "The person who owns the cash initially, now owns the survey." using (inputCash.owner == outputSurvey.owner)
-                    "The person who owns the cash initially, now owns the survey key." using (inputCash.owner == outputSurveyKey.owner)
-                    "The person who owns survey initially, now owns the cash." using (inputSurvey.owner == outputCash.owner)
-                    "The person who owns survey key initially, now owns the cash." using (inputSurveyKey.owner == outputCash.owner)
-                    "Cannot sell survey to yourself." using (inputSurvey.owner == outputSurvey.owner)
-                    "Cannot sell survey key to yourself." using (inputSurveyKey.owner == outputSurveyKey.owner)
+                    "The owner of the input cash, now owns the survey." using (inputCash.first().owner == outputSurvey.owner)
+                    "The owner of the survey initially, now owns the cash." using (inputSurvey.owner == outputCash.owner)
+                    "Cannot sell survey to yourself." using (inputSurvey.owner != outputSurvey.owner)
                     "All of the survey participants must be signers." using (command.signers.containsAll(inputSurvey.participants.map { it.owningKey }))
-                    "The cash owner must be signer." using (command.signers.containsAll(inputCash.participants.map { it.owningKey }))
+                    "The cash owner must be signer." using (command.signers.contains(inputCash.single().owner.owningKey))
                 }
             }
         }
@@ -127,10 +112,10 @@ class SurveyContract : Contract {
 
     // Used to indicate the transaction's intent.
     interface Commands : CommandData {
-        class Issue : Commands
-        class Trade : Commands
         class IssueRequest : Commands
+        class Issue : Commands
         class SendKey: Commands
+        class Trade : Commands
     }
 }
 
