@@ -1,24 +1,22 @@
 package com.survey.flows
 
 import co.paralleluniverse.fibers.Suspendable
-import com.survey.SurveyContract.Companion.SURVEY_CONTRACT_ID
-import net.corda.core.flows.*
-import net.corda.core.contracts.Command
-import net.corda.core.utilities.ProgressTracker
-import com.survey.SurveyState
 import com.survey.SurveyContract
+import com.survey.SurveyContract.Companion.SURVEY_CONTRACT_ID
 import com.survey.SurveyKeyState
 import com.survey.SurveyRequestState
-import net.corda.core.contracts.ContractState
+import com.survey.SurveyState
+import net.corda.core.contracts.Attachment
+import net.corda.core.contracts.Command
 import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.crypto.SecureHash
+import net.corda.core.flows.*
 import net.corda.core.identity.Party
-import net.corda.core.serialization.serialize
 import net.corda.core.transactions.TransactionBuilder
+import net.corda.core.utilities.ProgressTracker
 import net.corda.finance.POUNDS
 import net.corda.finance.contracts.asset.Cash
-import java.util.*
-import java.util.Objects.hash
+import javax.crypto.KeyGenerator
 
 
 object IssueFlow {
@@ -79,8 +77,7 @@ object IssueFlow {
                              val initialPrice : Int,
                              val propertyAddress: String,
                              val landTitleId: String,
-                             val encodedSurveyHash : String,
-                             val encodedSurveyKey : String) : FlowLogic<Unit>() {
+                             val survey: Attachment) : FlowLogic<Unit>() {
 
         @Suspendable
         override fun call() {
@@ -92,9 +89,10 @@ object IssueFlow {
             val surveyor = serviceHub.myInfo.legalIdentities.first()
 
             // Find attachment, encode it and compute it's hash
-            val qCriteria : queryCriteria = Que
-            val attachment = serviceHub.vaultService.queryBy()
-            val secureHash : SecureHash = SecureHash.parse(encodedSurveyHash)
+            survey.id
+
+            val keyGen = KeyGenerator.getInstance("AES");
+            keyGen.init(128)
 
             // Create SurveyState and SurveyKeyState
             // Issuance therefore in this case intialPrice == resalePrice
