@@ -13,6 +13,7 @@ import com.survey.SurveyRequestState
 import net.corda.confidential.IdentitySyncFlow
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.contracts.UniqueIdentifier
+import net.corda.core.contracts.requireThat
 import net.corda.core.flows.*
 import net.corda.core.identity.Party
 import net.corda.core.node.services.Vault
@@ -32,8 +33,7 @@ object RequestSurveyFlow{
     @StartableByRPC
     class Initiator(val surveyor: Party,
                     val landTitleId: String,
-                    val surveyPrice: Int,
-                    val status: String,
+                    val surveyPrice: Int
                     ) : FlowLogic<SignedTransaction>() {
 
         @Suspendable
@@ -42,7 +42,7 @@ object RequestSurveyFlow{
             progressTracker.currentStep = GENERATING_TRANSACTION
             // How to create a new linearId?
             val outputSurveyRequest = SurveyRequestState(
-                    ourIdentity, surveyor, landTitleId, surveyPrice, "pending", ???)
+                    ourIdentity, surveyor, landTitleId, surveyPrice, "pending")
 
             // Stage 2. This flow can only be initiated by the requester.
             val surveyRequestIdentity = outputSurveyRequest.requester
@@ -50,8 +50,8 @@ object RequestSurveyFlow{
                 throw FlowException("Survey request trade must be initiated by the requester.")
             }
 
-            // Stage 3. Create a trade command.
-            val tradeCommand = Command(
+            // Stage 3. Create an issue command.
+            val issueRequestCommand = Command(
                     SurveyContract.Commands.IssueRequest(),
                     outputSurveyRequest.participants.map { it.owningKey })
 
@@ -59,12 +59,11 @@ object RequestSurveyFlow{
             val firstNotary = serviceHub.networkMapCache.notaryIdentities.first()
             progressTracker.currentStep = BUILDING_TRANSACTION
             val builder = TransactionBuilder(firstNotary)
-                    .addInputState(???)
                     .addOutputState(outputSurveyRequest, SURVEY_CONTRACT_ID)
-                    .addCommand(tradeCommand)
+                    .addCommand(issueRequestCommand)
 
-            // Not sure whether the below is correct
-            ??? val (_, cashSigningKeys) = Cash.generateSpend(serviceHub, builder, outputSurveyRequest.surveyPrice.POUNDS, outputSurveyRequest.surveyor)
+            //  This is correct
+            Cash.generateSpend(serviceHub, builder, outputSurveyRequest.surveyPrice.POUNDS, outputSurveyRequest.surveyor)
 
             // Stage 5. Verify the transaction.
             progressTracker.currentStep = VERIFYING_TRANSACTION
@@ -76,8 +75,8 @@ object RequestSurveyFlow{
 
             // Stage 7. Get counterparty signature.
             progressTracker.currentStep = GATHERING_SIGS
-            val session = initiateFlow(outputSurveyRequest.requester)
-            subFlow(IdentitySyncFlow.Send(session, ptx.tx))
+            val session = initiateFlow(outputSurveyRequest.surveyor)
+
             val stx = subFlow(CollectSignaturesFlow(
                     ptx,
                     setOf(session),
@@ -118,18 +117,16 @@ object RequestSurveyFlow{
     }
 
     @InitiatedBy(Initiator::class)
-    class Responder(private val otherFlow: FlowSession) : FlowLogic<SignedTransaction>() {
+    class Responder(val otherPartyFlow: FlowSession) : FlowLogic<SignedTransaction>() {
         @Suspendable
         override fun call(): SignedTransaction {
-            subFlow(IdentitySyncFlow.Receive(otherFlow))
-            val stx = subFlow(SignTxFlowNoChecking(otherFlow))
-            return waitForLedgerCommit(stx.id)
-        }
-    }
-}
+            val signTransactionFlow = object : SignTransactionFlow(otherPartyFlow) {
+                override fun checkTransaction(stx: SignedTransaction) = requireThat {
+                    //stx.verify(serviceHub);
+                }
+            }
 
-internal class SignTxFlowNoChecking(otherFlow: FlowSession) : SignTransactionFlow(otherFlow) {
-    override fun checkTransaction(stx: SignedTransaction) {
-        // TODO: Add checking here.
+            return subFlow(signTransactionFlow)
+        }
     }
 }

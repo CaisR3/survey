@@ -1,5 +1,6 @@
 package com.survey
 
+import com.google.common.hash.HashCode
 import net.corda.core.contracts.*
 import net.corda.core.crypto.SecureHash
 import net.corda.core.identity.AbstractParty
@@ -72,17 +73,6 @@ class SurveyContract : Contract {
                 } catch(e: Exception) {
                     throw kotlin.IllegalArgumentException("Attachment missing or does not match hash.")
                 }
-
-            }
-            is Commands.SendKey -> {
-                requireThat {
-                    // Input and output states.
-                    "There should be one input state, the key." using (tx.inputStates.size == 1)
-                    "There should be one output state, the key." using (tx.outputStates.size == 1)
-                    val inputSurveyKey = tx.inputsOfType<SurveyKeyState>().single()
-                    val outputSurveyKey = tx.outputsOfType<SurveyKeyState>().single()
-                    "The key should be the same before and after." using (inputSurveyKey.encodedSurveyKey == outputSurveyKey.encodedSurveyKey)
-                }
             }
             is Commands.Trade -> {
                 requireThat {
@@ -93,11 +83,12 @@ class SurveyContract : Contract {
                     val outputCash = tx.outputsOfType<Cash.State>().single()
                     "There should be one input survey state" using (tx.inputsOfType<SurveyState>().size == 1)
                     "There should be one output survey state" using (tx.outputsOfType<SurveyState>().size == 1)
-                    "There should be at least input cast state" using (tx.inputsOfType<Cash.State>().size > 1)
-                    "There should be one output cast state" using (tx.outputsOfType<Cash.State>().size == 1)
+                    "There should be at least one input cash state" using (tx.inputsOfType<Cash.State>().size > 1)
+                    "There should be at least one output cash state" using (tx.outputsOfType<Cash.State>().size > 1)
                     "The initial and final hashes must be the same." using (inputSurvey.surveyHash == outputSurvey.surveyHash)
-                    "Input cash should be equal to the resale price" using (inputCash.sumCash().quantity.toInt() == outputSurvey.resalePrice)
-                    "Output cash should be equal to resale price" using (outputCash.amount.quantity.toInt() == inputSurvey.resalePrice)
+                    "Input cash should be at least equal to the resale price" using (inputCash.sumCash().quantity.toInt() >= outputSurvey.resalePrice)
+                    "Output cash to the owner should be equal to resale price" using (outputCash.ownedBy(outputSurvey.owner).amount.quantity.toDouble() == (inputSurvey.resalePrice * 0.8))
+                    "Output cash to issuer is equal to 20% of the resale price" using (outputCash.ownedBy(outputSurvey.issuer).amount.quantity.toDouble() == (inputSurvey.resalePrice * 0.2))
 
                     // Owners and signers.
                     "The owner of the input cash, now owns the survey." using (inputCash.first().owner == outputSurvey.owner)
@@ -114,7 +105,6 @@ class SurveyContract : Contract {
     interface Commands : CommandData {
         class IssueRequest : Commands
         class Issue : Commands
-        class SendKey: Commands
         class Trade : Commands
     }
 }
@@ -124,12 +114,10 @@ class SurveyContract : Contract {
 // *********
 data class SurveyState(val issuer: Party,
                        val owner: Party,
-                       val propertyAddress: String,
                        val landTitleId: String,
-                       val surveyDate: String,
                        val initialPrice: Int,
                        val resalePrice: Int,
-                       val surveyHash: SecureHash,
+                       val surveyHash: Int,
                        override val linearId: UniqueIdentifier) : LinearState {
     override val participants: List<AbstractParty> get() = listOf(issuer, owner)
 }
@@ -154,6 +142,6 @@ data class SurveyRequestState(val requester: Party,
                               val landTitleId: String,
                               val surveyPrice: Int,
                               val status: String,
-                              override val linearId: UniqueIdentifier) : LinearState {
-    override val participants: List<AbstractParty> get() = listOf(requester)
+                              override val linearId: UniqueIdentifier = UniqueIdentifier()) : LinearState {
+    override val participants: List<AbstractParty> get() = listOf(requester, surveyor)
 }

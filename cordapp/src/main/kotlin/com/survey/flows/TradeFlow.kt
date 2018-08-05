@@ -1,22 +1,18 @@
 package com.survey.flows
 
 import co.paralleluniverse.fibers.Suspendable
-import com.google.common.collect.ImmutableList
-import com.survey.SurveyContract.Companion.SURVEY_CONTRACT_ID
-import net.corda.core.transactions.SignedTransaction
-import net.corda.core.transactions.TransactionBuilder
-import net.corda.core.contracts.Command
-import net.corda.core.utilities.ProgressTracker
-import com.survey.SurveyState
+import com.survey.Helper.getSurveyByLinearId
 import com.survey.SurveyContract
+import com.survey.SurveyContract.Companion.SURVEY_CONTRACT_ID
+import com.survey.SurveyState
 import net.corda.confidential.IdentitySyncFlow
-import net.corda.core.contracts.StateAndRef
+import net.corda.core.contracts.Command
 import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.flows.*
 import net.corda.core.identity.Party
-import net.corda.core.node.services.Vault
-import net.corda.core.node.services.queryBy
-import net.corda.core.node.services.vault.QueryCriteria
+import net.corda.core.transactions.SignedTransaction
+import net.corda.core.transactions.TransactionBuilder
+import net.corda.core.utilities.ProgressTracker
 import net.corda.finance.POUNDS
 import net.corda.finance.contracts.asset.Cash
 
@@ -37,7 +33,7 @@ object TradeFlow{
         override fun call() : SignedTransaction {
             // Stage 1. Retrieve survey specified by linearId from the vault.
             progressTracker.currentStep = GENERATING_TRANSACTION
-            val surveyToTransfer = getSurveyByLinearId(surveyLinearId)
+            val surveyToTransfer = getSurveyByLinearId(surveyLinearId, serviceHub)
             val inputSurvey = surveyToTransfer.state.data
             val transferredSurvey = createOutputSurvey(inputSurvey)
 
@@ -87,14 +83,6 @@ object TradeFlow{
             return subFlow(FinalityFlow(stx, FINALISING_TRANSACTION.childProgressTracker()))
         }
 
-        private fun getSurveyByLinearId(linearId: UniqueIdentifier): StateAndRef<SurveyState> {
-            val queryCriteria = QueryCriteria.LinearStateQueryCriteria(
-                    null,
-                    ImmutableList.of(linearId),
-                    Vault.StateStatus.UNCONSUMED, null)
-            return serviceHub.vaultService.queryBy<SurveyState>(queryCriteria).states.singleOrNull()
-                    ?: throw FlowException("Survey with id $linearId not found.")
-        }
 
         @Suspendable
         private fun createOutputSurvey(inputSurvey: SurveyState): SurveyState {

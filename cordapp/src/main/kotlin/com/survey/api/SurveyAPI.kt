@@ -1,29 +1,20 @@
 package com.survey.api
 
 import com.survey.SurveyState
-import com.survey.flows.IssueFlow.SurveyIssuanceFlow
-import com.survey.flows.IssueFlow.SurveyRequestFlow
-import com.template.flow.SelfIssueCashFlow
-import net.corda.finance.flows.*
+import com.survey.flows.IssueFlow
 import net.corda.core.contracts.Amount
-import net.corda.core.crypto.SecureHash
-import java.util.Currency
 import net.corda.core.identity.CordaX500Name
-import net.corda.core.identity.Party
 import net.corda.core.messaging.CordaRPCOps
-import net.corda.core.messaging.startFlow
 import net.corda.core.messaging.vaultQueryBy
 import net.corda.core.node.services.IdentityService
 import net.corda.core.utilities.OpaqueBytes
-import net.corda.core.utilities.getOrThrow
+import net.corda.core.utilities.loggerFor
+import net.corda.finance.flows.CashIssueFlow
+import org.slf4j.Logger
+import java.util.*
 import javax.ws.rs.*
 import javax.ws.rs.core.MediaType
 import javax.ws.rs.core.Response
-import net.corda.core.utilities.loggerFor
-import net.corda.finance.contracts.asset.Cash
-import org.slf4j.Logger
-import javax.ws.rs.core.Response.Status.BAD_REQUEST
-import javax.ws.rs.core.Response.Status.CREATED
 
 
 // *****************
@@ -136,7 +127,7 @@ class SurveyAPI(val rpcOps: CordaRPCOps) {
         val purchaserParty = rpcOps.wellKnownPartyFromX500Name(purchaserx500Name) ?: throw Exception("Party not recognised.")
 
         return try {
-            val signedTx = rpcOps.startTrackedFlowDynamic(SurveyIssuanceFlow::class.java, purchaserParty, surveyDate, price, propertyAddress, landTitleId, encodedSurveyHash, encodedSurveyKey).returnValue.getOrThrow()
+            val signedTx = rpcOps.startTrackedFlowDynamic(IssueFlow.IssueSurveyFlow::class.java, purchaserParty, surveyDate, price, propertyAddress, landTitleId, encodedSurveyHash, encodedSurveyKey).returnValue.getOrThrow()
             Response.status(Response.Status.CREATED).entity("Transaction id "+signedTx.hashCode()+" committed to ledger.\n").build()
 
         } catch (ex: Throwable) {
