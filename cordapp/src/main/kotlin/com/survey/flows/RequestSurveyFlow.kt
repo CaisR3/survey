@@ -1,23 +1,29 @@
 package com.survey.flows
 
 import co.paralleluniverse.fibers.Suspendable
-import com.survey.Helper.getSurveyByLinearId
-import com.survey.SurveyContract
+import com.google.common.collect.ImmutableList
 import com.survey.SurveyContract.Companion.SURVEY_CONTRACT_ID
-import com.survey.SurveyState
-import net.corda.confidential.IdentitySyncFlow
-import net.corda.core.contracts.Command
-import net.corda.core.contracts.UniqueIdentifier
-import net.corda.core.flows.*
-import net.corda.core.identity.Party
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
+import net.corda.core.contracts.Command
 import net.corda.core.utilities.ProgressTracker
+import com.survey.SurveyState
+import com.survey.SurveyContract
+import com.survey.SurveyRequestState
+import net.corda.confidential.IdentitySyncFlow
+import net.corda.core.contracts.StateAndRef
+import net.corda.core.contracts.UniqueIdentifier
+import net.corda.core.contracts.requireThat
+import net.corda.core.flows.*
+import net.corda.core.identity.Party
+import net.corda.core.node.services.Vault
+import net.corda.core.node.services.queryBy
+import net.corda.core.node.services.vault.QueryCriteria
 import net.corda.finance.POUNDS
 import net.corda.finance.contracts.asset.Cash
 
 
-object TradeFlow{
+object RequestSurveyFlow{
 
     // *************
     // * Trade flow *
@@ -25,59 +31,61 @@ object TradeFlow{
     // *************
     @InitiatingFlow
     @StartableByRPC
-    class Initiator(private val surveyLinearId: UniqueIdentifier,
-                    private val buyer: Party
+    class Initiator(val surveyor: Party,
+                    val landTitleId: String,
+                    val surveyPrice: Int
     ) : FlowLogic<SignedTransaction>() {
 
         @Suspendable
         override fun call() : SignedTransaction {
-            // Stage 1. Retrieve survey specified by linearId from the vault.
+            // Stage 1. Create new survey request.
             progressTracker.currentStep = GENERATING_TRANSACTION
-            val surveyToTransfer = getSurveyByLinearId(surveyLinearId, serviceHub)
-            val inputSurvey = surveyToTransfer.state.data
-            val transferredSurvey = createOutputSurvey(inputSurvey)
+            // How to create a new linearId?
+            val outputSurveyRequest = SurveyRequestState(
+                    ourIdentity, surveyor, landTitleId, surveyPrice, "pending")
 
-            // Stage 2. This flow can only be initiated by the current survey owner.
-            val surveyIdentity = inputSurvey.owner
-            check(surveyIdentity == ourIdentity) {
-                throw FlowException("Survey trade must be initiated by the owner.")
+            // Stage 2. This flow can only be initiated by the requester.
+            val surveyRequestIdentity = outputSurveyRequest.requester
+            check(surveyRequestIdentity == ourIdentity) {
+                throw FlowException("Survey request trade must be initiated by the requester.")
             }
 
-            // Stage 3. Create a trade command.
-            val tradeCommand = Command(
-                    SurveyContract.Commands.Trade(),
-                    listOf(inputSurvey.owner.owningKey, inputSurvey.issuer.owningKey, buyer.owningKey))
+            // Stage 3. Create an issue command.
+            val issueRequestCommand = Command(
+                    SurveyContract.Commands.IssueRequest(),
+                    outputSurveyRequest.participants.map { it.owningKey })
 
             // Stage 4. Create a transaction builder. Add the trade command and input survey.
             val firstNotary = serviceHub.networkMapCache.notaryIdentities.first()
             progressTracker.currentStep = BUILDING_TRANSACTION
             val builder = TransactionBuilder(firstNotary)
-                    .addInputState(surveyToTransfer)
-                    .addOutputState(transferredSurvey, SURVEY_CONTRACT_ID)
-                    .addCommand(tradeCommand)
-                    .addAttachment(surveyToTransfer.state.data.surveyHash)
+                    .addOutputState(outputSurveyRequest, SURVEY_CONTRACT_ID)
+                    .addCommand(issueRequestCommand)
 
-            val session = initiateFlow(buyer)
+            //  This is correct
+            Cash.generateSpend(serviceHub, builder, outputSurveyRequest.surveyPrice.POUNDS, outputSurveyRequest.surveyor)
 
-            val ptx = subFlow(TradeBuildingFlow.Initiator(session, builder))
-
+            // Stage 5. Verify the transaction.
+            progressTracker.currentStep = VERIFYING_TRANSACTION
             builder.verify(serviceHub)
 
             // Stage 6. Sign the transaction.
             progressTracker.currentStep = SIGNING_TRANSACTION
-            val stx = serviceHub.addSignature(ptx)
+            val ptx = serviceHub.signInitialTransaction(builder, outputSurveyRequest.requester.owningKey)
 
             // Stage 7. Get counterparty signature.
             progressTracker.currentStep = GATHERING_SIGS
+            val session = initiateFlow(outputSurveyRequest.surveyor)
+
+            val stx = subFlow(CollectSignaturesFlow(
+                    ptx,
+                    setOf(session),
+                    GATHERING_SIGS.childProgressTracker())
+            )
 
             // Stage 8. Finalize the transaction.
             progressTracker.currentStep = FINALISING_TRANSACTION
             return subFlow(FinalityFlow(stx, FINALISING_TRANSACTION.childProgressTracker()))
-        }
-
-        @Suspendable
-        private fun createOutputSurvey(inputSurvey: SurveyState): SurveyState {
-            return inputSurvey.copy(owner = buyer)
         }
 
         /**
@@ -105,6 +113,20 @@ object TradeFlow{
                     GATHERING_SIGS,
                     FINALISING_TRANSACTION
             )
+        }
+    }
+
+    @InitiatedBy(Initiator::class)
+    class Responder(val otherPartyFlow: FlowSession) : FlowLogic<SignedTransaction>() {
+        @Suspendable
+        override fun call(): SignedTransaction {
+            val signTransactionFlow = object : SignTransactionFlow(otherPartyFlow) {
+                override fun checkTransaction(stx: SignedTransaction) = requireThat {
+                    //stx.verify(serviceHub);
+                }
+            }
+
+            return subFlow(signTransactionFlow)
         }
     }
 }
