@@ -127,6 +127,7 @@ data class SurveyState(val issuer: Party,
 // * The facts shared by the surveyor to
 // * the buyer once the survey is complete
 // *********
+
 data class SurveyKeyState(val encodedSurveyKey: String,
                           override val linearId: UniqueIdentifier) : LinearState {
     override val participants: List<AbstractParty> get() = listOf()
