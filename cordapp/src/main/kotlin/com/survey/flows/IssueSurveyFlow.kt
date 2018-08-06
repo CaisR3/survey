@@ -39,7 +39,7 @@ object IssueFlow {
     @InitiatingFlow
     @StartableByRPC
     class IssueSurveyFlow(val linearId: UniqueIdentifier, val attachmentHash: SecureHash) : FlowLogic<Unit>() {
-        val ORACLE_NAME = CordaX500Name("Oracle", "New York", "US")
+        val ORACLE_NAME = CordaX500Name("Oracle", "London", "GB")
 
         @Suspendable
         override fun call() {
