@@ -3,6 +3,7 @@ package com.survey.api
 import com.survey.SurveyState
 import com.survey.flows.IssueFlow
 import com.survey.flows.RequestSurveyFlow
+import com.survey.flows.TradeFlow
 import net.corda.core.contracts.Amount
 import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.identity.CordaX500Name
@@ -11,6 +12,7 @@ import net.corda.core.messaging.vaultQueryBy
 import net.corda.core.node.services.IdentityService
 import net.corda.core.utilities.OpaqueBytes
 import net.corda.core.utilities.loggerFor
+import net.corda.finance.POUNDS
 import net.corda.finance.flows.CashIssueFlow
 import org.slf4j.Logger
 import java.util.*
@@ -80,7 +82,6 @@ class SurveyAPI(val rpcOps: CordaRPCOps) {
     @Produces(MediaType.APPLICATION_JSON)
     fun getKey(surveyId: UniqueIdentifier) {
         val survey = rpcOps.vaultQueryBy<SurveyState>().states.filter { it.state.data.linearId == surveyId }
-
     }
 
     /*
@@ -149,13 +150,33 @@ class SurveyAPI(val rpcOps: CordaRPCOps) {
         }
     }
 
+    /**
+     * Endpoint for Surveyor to issue a survey
+     */
+    @PUT
+    @Path("trade-survey")
+    fun issueSurvey(@QueryParam("purchaser") purchaser : String, @QueryParam("surveyId") surveyId : String) : Response{
+
+        val purchaserx500Name = CordaX500Name.parse(purchaser)
+        val purchaserParty = rpcOps.wellKnownPartyFromX500Name(purchaserx500Name) ?: throw Exception("Party not recognised.")
+        val uniqueIdentifier = UniqueIdentifier.fromString(surveyId)
+
+        return try {
+            val signedTx = rpcOps.startTrackedFlowDynamic(TradeFlow.Initiator::class.java, uniqueIdentifier, purchaserParty).returnValue
+            Response.status(Response.Status.CREATED).entity("Transaction id "+signedTx.hashCode()+" committed to ledger.\n").build()
+
+        } catch (ex: Throwable) {
+            logger.error(ex.message, ex)
+            Response.status(Response.Status.BAD_REQUEST).entity(ex.message!!).build()
+        }
+    }
+
     @PUT
     @Path("self-issue-cash")
-    fun selfIssueCash(@QueryParam(value = "amount") amount: Int,
-                      @QueryParam(value = "currency") currency: String): Response {
+    fun selfIssueCash(): Response {
 
         // 1. Prepare issue request.
-        val issueAmount = Amount(amount.toLong() * 100, Currency.getInstance(currency))
+        val issueAmount = 1000000.POUNDS
         val notary = rpcOps.notaryIdentities().firstOrNull() ?: throw IllegalStateException("Could not find a notary.")
         val issueRef = OpaqueBytes.of(0)
         val issueRequest = CashIssueFlow.IssueRequest(issueAmount, issueRef, notary)

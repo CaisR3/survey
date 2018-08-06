@@ -108,6 +108,7 @@ object RequestSurveyFlow{
 
             fun tracker() = ProgressTracker(
                     GENERATING_TRANSACTION,
+                    BUILDING_TRANSACTION,
                     VERIFYING_TRANSACTION,
                     SIGNING_TRANSACTION,
                     GATHERING_SIGS,

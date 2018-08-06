@@ -29,22 +29,22 @@ class SurveyContract : Contract {
             is Commands.IssueRequest -> {
                 requireThat {
                     // Input and output states.
-                    "There should be one input state, cash." using (tx.inputStates.size == 1)
-                    "There should be two output states, cash and survey request." using (tx.outputStates.size == 2)
+                    "There should be at least one input cash state." using (tx.inputStates.size >= 1)
+                    "There should be at least two output states, cash and survey request." using (tx.outputStates.size >= 2)
 
-                    val inputCash = tx.inputsOfType<Cash.State>().single()
-                    val outputCash = tx.outputsOfType<Cash.State>().single()
+                    val inputCash = tx.inputsOfType<Cash.State>()
+                    val outputCash = tx.outputsOfType<Cash.State>()
                     val outputSurveyRequest = tx.outputsOfType<SurveyRequestState>().single()
                     "The survey price must positive." using (outputSurveyRequest.surveyPrice > 0)
-                    "The survey price must be equal to the cash." using (inputCash.amount.quantity.toInt() == outputSurveyRequest.surveyPrice)
-                    "The input cash must be equal to the output cash." using (inputCash.amount.quantity == outputCash.amount.quantity)
+                    "The cash must be greater than the survey price." using (inputCash.sumCash().quantity.toInt() >= outputSurveyRequest.surveyPrice)
+                    "The input cash must be equal to the output cash." using (inputCash.sumCash().quantity == outputCash.sumCash().quantity)
                     "The output survey status is pending." using (outputSurveyRequest.status == "Pending")
 
                     // Owners and signers.
-                    "The input cash owner is the requester." using (inputCash.owner == outputSurveyRequest.requester)
-                    "The output cash owner is the surveyor." using (outputCash.owner == outputSurveyRequest.surveyor)
+                    "The input cash owner is the requester." using (inputCash.first().owner == outputSurveyRequest.requester)
+                    "The output cash owner is the surveyor." using (outputCash.first().owner == outputSurveyRequest.surveyor)
                     "The surveyor and requester must be signers." using (command.signers.containsAll(outputSurveyRequest.participants.map { it.owningKey }))
-                    "The input cash owner must be signer." using (command.signers.containsAll(inputCash.participants.map { it.owningKey }))
+                    "The input cash owner must be signer." using (command.signers.containsAll(inputCash.first().participants.map { it.owningKey }))
                 }
             }
             is Commands.Issue -> {
