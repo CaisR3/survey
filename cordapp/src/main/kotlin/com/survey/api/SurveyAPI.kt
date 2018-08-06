@@ -15,6 +15,9 @@ import net.corda.core.utilities.loggerFor
 import net.corda.finance.POUNDS
 import net.corda.finance.flows.CashIssueFlow
 import org.slf4j.Logger
+import java.io.File
+import java.io.FileInputStream
+import java.io.InputStream
 import java.util.*
 import javax.ws.rs.*
 import javax.ws.rs.core.MediaType
@@ -91,6 +94,9 @@ class SurveyAPI(val rpcOps: CordaRPCOps) {
     @Path("upload/attachment")
     @Produces(MediaType.APPLICATION_JSON)
     fun uploadAttachment() {
+        val file = File("report.jar")
+        val inputStream = FileInputStream(file)
+        rpcOps.uploadAttachment(inputStream)
         System.out.println("--------uploading attachment-------")
     }
 

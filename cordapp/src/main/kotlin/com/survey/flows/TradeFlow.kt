@@ -13,6 +13,7 @@ import net.corda.core.identity.Party
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.ProgressTracker
+import net.corda.core.utilities.unwrap
 import net.corda.finance.POUNDS
 import net.corda.finance.contracts.asset.Cash
 
@@ -59,16 +60,14 @@ object TradeFlow{
 
             val session = initiateFlow(buyer)
 
-            val ptx = subFlow(TradeBuildingFlow.Initiator(session, builder))
+            val ptx = session.sendAndReceive<SignedTransaction>(builder).unwrap { it }
 
-            builder.verify(serviceHub)
+            // Stage 5. Verify
+            ptx.verify(serviceHub, false)
 
             // Stage 6. Sign the transaction.
             progressTracker.currentStep = SIGNING_TRANSACTION
             val stx = serviceHub.addSignature(ptx)
-
-            // Stage 7. Get counterparty signature.
-            progressTracker.currentStep = GATHERING_SIGS
 
             // Stage 8. Finalize the transaction.
             progressTracker.currentStep = FINALISING_TRANSACTION
@@ -100,6 +99,7 @@ object TradeFlow{
 
             fun tracker() = ProgressTracker(
                     GENERATING_TRANSACTION,
+                    BUILDING_TRANSACTION,
                     VERIFYING_TRANSACTION,
                     SIGNING_TRANSACTION,
                     GATHERING_SIGS,

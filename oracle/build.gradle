@@ -57,6 +57,7 @@ dependencies {
     // Specify your CorDapp's dependencies below, including dependent CorDapps.
     cordapp project(":cordapp-contracts-states")
     cordapp project(":cordapp")
+    cordapp project(":oracle")
 }
 
 task integrationTest(type: Test, dependsOn: []) {

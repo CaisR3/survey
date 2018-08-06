@@ -9,6 +9,7 @@ import net.corda.core.node.ServiceHub
 import net.corda.core.node.services.Vault
 import net.corda.core.node.services.queryBy
 import net.corda.core.node.services.vault.QueryCriteria
+import java.io.InputStream
 import java.security.Key
 import java.util.jar.JarInputStream
 
@@ -35,7 +36,11 @@ public object Helper {
                 ?: throw FlowException("Survey with id $linearId not found.")
     }
 
-    fun encryptAttachment(attachment: JarInputStream): Pair<ByteArray?, Key?> {
-        return Pair(null, null)
+    fun encryptAttachment(attachment: InputStream): Pair<ByteArray?, ByteArray?> {
+        return AESenc.encrypt(attachment)
+    }
+
+    fun decryptAttachment(attachment: JarInputStream): Pair<ByteArray?, ByteArray?> {
+        return AESenc.encrypt(attachment)
     }
 }

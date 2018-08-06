@@ -7,16 +7,17 @@ import net.corda.core.flows.FlowException
 import net.corda.core.flows.FlowLogic
 import net.corda.core.flows.FlowSession
 import net.corda.core.flows.InitiatedBy
+import net.corda.core.node.services.AttachmentId
 import net.corda.core.utilities.unwrap
 import java.security.Key
 
 /** Called by the oracle to provide a stock's spot price to a client. */
 @InitiatedBy(IssueFlow.IssueSurveyFlow::class)
-class GiveOracleKey(private val counterpartySession: FlowSession) : FlowLogic<Boolean>() {
+class GiveOracleKey(private val counterpartySession: FlowSession) : FlowLogic<Unit>() {
 
     @Suspendable
-    override fun call(): Boolean {
-        val payload = counterpartySession.receive<Pair<Int, Key>>().unwrap { it }
+    override fun call(): Unit {
+        val payload = counterpartySession.receive<Pair<AttachmentId, ByteArray>>().unwrap { it }
 
         val databaseService = serviceHub.cordaService(DatabaseService::class.java)
         // BE CAREFUL when accessing the node's database in flows:
@@ -28,14 +29,14 @@ class GiveOracleKey(private val counterpartySession: FlowSession) : FlowLogic<Bo
         try {
             databaseService.addKey(payload)
         } catch(e: Exception) {
-            return false;
+            counterpartySession.send(false)
         }
 
-        return true
+        counterpartySession.send(true)
     }
 }
 
-//@InitiatedBy(QueryOracle::class)
+@InitiatedBy(RequestKeyFlow.Initiator::class)
 class QueryOracleForKey(private val counterpartySession: FlowSession) : FlowLogic<Unit>() {
 
     @Suspendable

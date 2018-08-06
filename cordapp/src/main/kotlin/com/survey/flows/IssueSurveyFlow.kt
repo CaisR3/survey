@@ -1,29 +1,27 @@
 package com.survey.flows
 
 import co.paralleluniverse.fibers.Suspendable
-import com.sun.org.apache.xpath.internal.operations.Bool
-import com.survey.*
+import com.survey.CreateJar
 import com.survey.Helper.encryptAttachment
-import com.survey.Helper.getSurveyByLinearId
 import com.survey.Helper.getSurveyRequestByLinearId
+import com.survey.SurveyContract
 import com.survey.SurveyContract.Companion.SURVEY_CONTRACT_ID
-import net.corda.core.flows.*
+import com.survey.SurveyState
+import com.survey.firstIdentityByName
 import net.corda.core.contracts.Command
-import net.corda.core.utilities.ProgressTracker
-import net.corda.core.contracts.ContractState
 import net.corda.core.contracts.UniqueIdentifier
+import net.corda.core.contracts.requireThat
 import net.corda.core.crypto.SecureHash
+import net.corda.core.flows.*
 import net.corda.core.identity.CordaX500Name
-import net.corda.core.identity.Party
-import net.corda.core.serialization.serialize
+import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
+import net.corda.core.utilities.ProgressTracker
 import net.corda.core.utilities.unwrap
-import net.corda.finance.POUNDS
-import net.corda.finance.contracts.asset.Cash
-import java.security.Key
-import java.util.*
-import java.util.Objects.hash
-import javax.crypto.KeyGenerator
+import org.apache.commons.io.FileUtils
+import java.io.ByteArrayInputStream
+import java.io.File
+import java.io.FileInputStream
 
 
 object IssueFlow {
@@ -38,11 +36,11 @@ object IssueFlow {
     // Buyer makes a request to get their house Surveyed, sending address and payment
     @InitiatingFlow
     @StartableByRPC
-    class IssueSurveyFlow(val linearId: UniqueIdentifier, val attachmentHash: SecureHash) : FlowLogic<Unit>() {
+    class IssueSurveyFlow(val linearId: UniqueIdentifier, val attachmentHash: SecureHash) : FlowLogic<SignedTransaction>() {
         val ORACLE_NAME = CordaX500Name("Oracle", "London", "GB")
 
         @Suspendable
-        override fun call() {
+        override fun call(): SignedTransaction {
 
             val requestState = getSurveyRequestByLinearId(linearId, serviceHub)
 
@@ -53,18 +51,21 @@ object IssueFlow {
             val requester = requestState.state.data.requester
 
             // Step 1 :  generate unsigned transaction
-            val attachment = serviceHub.attachments.openAttachment(attachmentHash)!!.openAsJAR()
+            val attachment = serviceHub.attachments.openAttachment(attachmentHash)!!.open()
 
-            // TODO here
+            // Encrypt and store new encrypted attachment
             val result = encryptAttachment(attachment)
-            val hashOfEncryptedAttachment = SecureHash.sha256(result.first!!)
+            val fileName = "encryptedReport"
+            FileUtils.writeByteArrayToFile(File(fileName), result.first!!)
 
+            //Create jar from encrypted file
+            CreateJar().run(fileName)
+            val hashOfEncryptedAttachment = serviceHub.attachments.importAttachment(FileInputStream(File(fileName + ".jar")))
 
             val survey: SurveyState = SurveyState(
                     ourIdentity, requester, requestState.state.data.landTitleId,
                     requestState.state.data.surveyPrice, requestState.state.data.surveyPrice,
                     hashOfEncryptedAttachment, linearId)
-
 
             val oracle = serviceHub.firstIdentityByName(ORACLE_NAME)
             val session = initiateFlow(oracle)
@@ -74,23 +75,27 @@ object IssueFlow {
                 throw FlowException("The Oracle rejected the key.")
             }
 
-            val surveyRequestUpdated = requestState.state.data.copy(status = "Complete")
+            val surveyRequestUpdated = requestState.state.data.copy(status = "complete")
 
             val txCommand = Command(SurveyContract.Commands.Issue(), survey.participants.map { it.owningKey })
             val txBuilder = TransactionBuilder(notary)
                     .addInputState(requestState)
                     .addOutputState(survey, SURVEY_CONTRACT_ID)
                     .addOutputState(surveyRequestUpdated, SURVEY_CONTRACT_ID)
+                    .addAttachment(hashOfEncryptedAttachment)
                     .addCommand(txCommand)
 
             // Verify that the transaction is valid.
             txBuilder.verify(serviceHub)
 
             // Stage 3. self sign the transaction
-            val selfSignedTx = serviceHub.signInitialTransaction(txBuilder)
+            val ptx = serviceHub.signInitialTransaction(txBuilder)
+
+            val buyerSession = initiateFlow(requester)
+            val stx = subFlow(CollectSignaturesFlow(ptx, setOf(buyerSession)))
 
             // Stage 4. Notarise and record the transaction in both parties' vaults.
-            subFlow(FinalityFlow(selfSignedTx))
+            return subFlow(FinalityFlow(stx))
         }
 
         override val progressTracker = tracker()
@@ -114,6 +119,20 @@ object IssueFlow {
                     GATHERING_SIGS,
                     FINALISING_TRANSACTION
             )
+        }
+    }
+
+    @InitiatedBy(IssueFlow.IssueSurveyFlow::class)
+    class Acceptor(val otherPartyFlow: FlowSession) : FlowLogic<SignedTransaction>() {
+        @Suspendable
+        override fun call(): SignedTransaction {
+            val signTransactionFlow = object : SignTransactionFlow(otherPartyFlow) {
+                override fun checkTransaction(stx: SignedTransaction) = requireThat {
+                    //stx.verify(serviceHub);
+                }
+            }
+
+            return subFlow(signTransactionFlow)
         }
     }
 }

@@ -38,7 +38,7 @@ class SurveyContract : Contract {
                     "The survey price must positive." using (outputSurveyRequest.surveyPrice > 0)
                     "The cash must be greater than the survey price." using (inputCash.sumCash().quantity.toInt() >= outputSurveyRequest.surveyPrice)
                     "The input cash must be equal to the output cash." using (inputCash.sumCash().quantity == outputCash.sumCash().quantity)
-                    "The output survey status is pending." using (outputSurveyRequest.status == "Pending")
+                    "The output survey status is pending." using (outputSurveyRequest.status == "pending")
 
                     // Owners and signers.
                     "The input cash owner is the requester." using (inputCash.first().owner == outputSurveyRequest.requester)
@@ -52,7 +52,7 @@ class SurveyContract : Contract {
                 requireThat {
                     // Input and output states.
                     "One input state should be consumed, the survey request." using (tx.inputStates.size == 1)
-                    "Three output states should be created, the survey, the survey key, and the survey request." using (tx.outputs.size == 3)
+                    "Two output states should be created, the survey and the updated survey request." using (tx.outputs.size == 2)
 
                     val inputSurveyRequest = tx.inputsOfType<SurveyRequestState>().single()
                     val outputSurveyKey = tx.outputsOfType<SurveyKeyState>().singleOrNull()
@@ -60,8 +60,7 @@ class SurveyContract : Contract {
                     // Sample constraints.
                     "The survey's initial price must be positive." using (outputSurvey.initialPrice > 0)
                     "The initial price must be equal to the resale price." using (outputSurvey.initialPrice == outputSurvey.resalePrice)
-                    "The output survey request status is complete." using (outputSurveyRequest.status == "Complete")
-                    "The key is included." using (outputSurveyKey != null)
+                    "The output survey request status is complete." using (outputSurveyRequest.status == "complete")
 
                     // Owners and signers.
                     "The purchase requester is the final survey owner." using (inputSurveyRequest.requester == outputSurvey.owner)
@@ -143,6 +142,6 @@ data class SurveyRequestState(val requester: Party,
                               val landTitleId: String,
                               val surveyPrice: Int,
                               val status: String,
-                              override val linearId: UniqueIdentifier = UniqueIdentifier()) : LinearState {
+                              override val linearId: UniqueIdentifier = UniqueIdentifier(landTitleId)) : LinearState {
     override val participants: List<AbstractParty> get() = listOf(requester, surveyor)
 }

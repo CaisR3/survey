@@ -23,6 +23,10 @@ open class DatabaseService(private val services: ServiceHub) : SingletonSerializ
 
     val TABLE_NAME = "key_values"
 
+    init {
+        setUpStorage()
+    }
+
     companion object {
         val log = loggerFor<DatabaseService>()
     }
@@ -102,13 +106,13 @@ open class DatabaseService(private val services: ServiceHub) : SingletonSerializ
         return preparedStatement
     }
 
-    fun addKey(payload: Pair<Int, Key>) {
+    fun addKey(payload: Pair<SecureHash, ByteArray>) {
         val query = "insert into $TABLE_NAME values(?, ?)"
 
         // get base64 encoded version of the key
-        val encodedKey = Base64.getEncoder().encodeToString(payload.second.getEncoded())
+        val encodedKey = Base64.getEncoder().encodeToString(payload.second)
 
-        val params = mapOf(1 to payload.first, 2 to encodedKey)
+        val params = mapOf(1 to payload.first.hashCode(), 2 to encodedKey)
 
         executeUpdate(query, params)
         log.info("Key for hash ${payload.first} added to ${TABLE_NAME} table.")
@@ -131,6 +135,20 @@ open class DatabaseService(private val services: ServiceHub) : SingletonSerializ
 
         val decodedKey = Base64.getDecoder().decode(value)
         return SecretKeySpec(decodedKey, 0, decodedKey.size, "AES")
+    }
+
+    /**
+     * Initialises the table of crypto values.
+     */
+    private fun setUpStorage() {
+        val query = """
+            create table if not exists $TABLE_NAME(
+                token varchar(64),
+                value varchar(64)
+            )"""
+
+        executeUpdate(query, emptyMap())
+        log.info("Created crypto_values table.")
     }
 
 }

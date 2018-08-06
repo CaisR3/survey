@@ -7,7 +7,9 @@ import net.corda.core.serialization.SerializationWhitelist
 
 // Serialization whitelist.
 class TemplateSerializationWhitelist : SerializationWhitelist {
-    override val whitelist: List<Class<*>> = listOf(TemplateData::class.java)
+    override val whitelist: List<Class<*>> = listOf(TemplateData::class.java,
+            javax.crypto.spec.SecretKeySpec::class.java,
+            net.corda.core.transactions.TransactionBuilder::class.java)
 }
 
 // This class is not annotated with @CordaSerializable, so it must be added to the serialization whitelist, above, if
