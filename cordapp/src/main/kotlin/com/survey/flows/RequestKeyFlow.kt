@@ -22,7 +22,7 @@ object RequestKeyFlow {
     class Initiator(private val surveyLinearId: UniqueIdentifier
     ) : FlowLogic<Unit>() {
 
-        val ORACLE_NAME = CordaX500Name("Oracle", "New York", "US")
+        val ORACLE_NAME = CordaX500Name("Oracle", "London", "US")
 
         @Suspendable
         override fun call() : Unit {
