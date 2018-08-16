@@ -26,8 +26,9 @@ import net.corda.finance.contracts.asset.Cash
 object RequestSurveyFlow{
 
     // *************
-    // * Trade flow *
-    // The mechanism for trading a survey for payment
+    // * Request Survey flow *
+    // * Begins process of buyer purchasing a new survey from a surveyor
+    // * transfers property details along with payment
     // *************
     @InitiatingFlow
     @StartableByRPC
@@ -55,7 +56,7 @@ object RequestSurveyFlow{
                     SurveyContract.Commands.IssueRequest(),
                     outputSurveyRequest.participants.map { it.owningKey })
 
-            // Stage 4. Create a transaction builder. Add the trade command and input survey.
+            // Stage 4. Create a transaction builder. Add the issue request command and survey request state.
             val firstNotary = serviceHub.networkMapCache.notaryIdentities.first()
             progressTracker.currentStep = BUILDING_TRANSACTION
             val builder = TransactionBuilder(firstNotary)

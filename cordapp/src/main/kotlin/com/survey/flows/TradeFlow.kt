@@ -14,15 +14,13 @@ import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.ProgressTracker
 import net.corda.core.utilities.unwrap
-import net.corda.finance.POUNDS
-import net.corda.finance.contracts.asset.Cash
+
 
 
 object TradeFlow{
 
     // *************
-    // * Trade flow *
-    // The mechanism for trading a survey for payment
+    //
     // *************
     @InitiatingFlow
     @StartableByRPC
@@ -36,6 +34,7 @@ object TradeFlow{
             progressTracker.currentStep = GENERATING_TRANSACTION
             val surveyToTransfer = getSurveyByLinearId(surveyLinearId, serviceHub)
             val inputSurvey = surveyToTransfer.state.data
+            // changes ownership of the survey
             val transferredSurvey = createOutputSurvey(inputSurvey)
 
             // Stage 2. This flow can only be initiated by the current survey owner.
@@ -44,7 +43,7 @@ object TradeFlow{
                 throw FlowException("Survey trade must be initiated by the owner.")
             }
 
-            // Stage 3. Create a trade command.
+            // Stage 3. Create a trade command, which contains all 3 signers needed for the tx, the issuer, owner and buyer
             val tradeCommand = Command(
                     SurveyContract.Commands.Trade(),
                     listOf(inputSurvey.owner.owningKey, inputSurvey.issuer.owningKey, buyer.owningKey))
@@ -58,6 +57,7 @@ object TradeFlow{
                     .addCommand(tradeCommand)
                     .addAttachment(surveyToTransfer.state.data.surveyHash)
 
+            // Initiate a communication session with the buyer, require their signature, accepting ownership of the survey
             val session = initiateFlow(buyer)
 
             val ptx = session.sendAndReceive<SignedTransaction>(builder).unwrap { it }

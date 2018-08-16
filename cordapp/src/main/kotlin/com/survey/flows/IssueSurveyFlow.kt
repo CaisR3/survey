@@ -50,15 +50,15 @@ object IssueFlow {
             // Identity of the requester
             val requester = requestState.state.data.requester
 
-            // Step 1 :  generate unsigned transaction
+            // retrieve attachment
             val attachment = serviceHub.attachments.openAttachment(attachmentHash)!!.open()
 
-            // Encrypt and store new encrypted attachment
+            // Encrypt (AES) and store new encrypted attachment
             val result = encryptAttachment(attachment)
             val fileName = "encryptedReport"
             FileUtils.writeByteArrayToFile(File(fileName), result.first!!)
 
-            //Create jar from encrypted file
+            // Create jar from encrypted file
             CreateJar().run(fileName)
             val hashOfEncryptedAttachment = serviceHub.attachments.importAttachment(FileInputStream(File(fileName + ".jar")))
 
@@ -67,14 +67,15 @@ object IssueFlow {
                     requestState.state.data.surveyPrice, requestState.state.data.surveyPrice,
                     hashOfEncryptedAttachment, linearId)
 
+            // Identify Oracle, initiate communication flow and send hash(encoded(surveyFile)) and key.
             val oracle = serviceHub.firstIdentityByName(ORACLE_NAME)
             val session = initiateFlow(oracle)
             val response = session.sendAndReceive<Boolean>(Pair(hashOfEncryptedAttachment, result.second))
-
             if (!response.unwrap { it }) {
                 throw FlowException("The Oracle rejected the key.")
             }
 
+            // copy and update requestState to status "complete" i.e survey has been completed
             val surveyRequestUpdated = requestState.state.data.copy(status = "complete")
 
             val txCommand = Command(SurveyContract.Commands.Issue(), survey.participants.map { it.owningKey })

@@ -23,8 +23,8 @@ import javax.annotation.Signed
 object TradeBuildingFlow{
 
     // *************
-    // * Trade flow *
-    // The mechanism for trading a survey for payment
+    // TradeBuildingFlow : buyer Responder flow that verifies the encoded survey has been recieved
+    // and procedes to issue payment to the seller and royalty to the initial issuer.
     // *************
     @InitiatedBy(TradeFlow.Initiator::class)
     @StartableByRPC
@@ -34,11 +34,12 @@ object TradeBuildingFlow{
         override fun call(): Unit {
             val builder = counterPartySession.receive<TransactionBuilder>().unwrap { it }
             val surveyState = builder.outputStates().first().data as SurveyState
+
             if(surveyState.owner == ourIdentity) {
                 Cash.generateSpend(serviceHub, builder, (surveyState.resalePrice * 0.8).POUNDS, counterPartySession.counterparty)
                 Cash.generateSpend(serviceHub, builder, (surveyState.resalePrice * 0.2).POUNDS, surveyState.issuer)
             } else {
-                throw FlowException("We're not the new owner")
+                throw FlowException("We're not the new survey owner, not paying!")
             }
 
             builder.verify(serviceHub)
